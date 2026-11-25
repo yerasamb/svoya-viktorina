@@ -207,6 +207,7 @@ body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#
   <p><a href="./">Я ведущий — открыть табло</a></p>
 </div>
 
+<script src="mqtt.min.js"></script>
 <script>
 {
 const BROKER=new URLSearchParams(location.search).get("broker")||"wss://broker.emqx.io:8084/mqtt";
