@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Своя викторина</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE occasion: a TV quiz night for two teams, loud but tidy
+   IDEA the studio board of a televised quiz with two buzzer podiums
+   PICTURE the board itself; on phones, one huge buzzer in the team colour
+   COLOUR studio blue ground, cobalt cells, gold prices, team red and team cyan
+   TYPE Russo One for prices and titles + Rubik for text
+   LAYOUT presentation: bar, two team podiums, board; phone: full-screen buzzer */
+:root{color-scheme:dark;--bg:#0a1240;--deep:#060b2b;--cell:#1b2fa0;--cellhi:#2a45d1;--line:#3c55e0;--ink:#f3f5ff;--mute:#a9b4ec;--gold:#ffc83d;--ok:#2fcf7f;--bad:#ff5a5f;--t1:#ff4d6d;--t2:#22c3ff}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(120% 80% at 50% 0%,#1a2a8a 0%,var(--bg) 55%,var(--deep) 100%) fixed;color:var(--ink);font:16px/1.5 Rubik,system-ui,sans-serif;overflow-x:clip}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:16px max(3vw,16px) 28px}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin-bottom:14px}
+h1{font:400 clamp(26px,4vw,40px)/1.05 "Russo One",sans-serif;margin:0}
+h1 span{color:var(--gold)}
+.round{font:400 15px "Russo One",sans-serif;background:var(--deep);border:1px solid var(--line);padding:6px 12px;border-radius:8px;color:var(--mute);white-space:nowrap}
+.tools{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;background:var(--cell);border:1px solid var(--line);font-weight:500}
+.btn:hover{background:var(--cellhi)}
+.btn.gold{background:var(--gold);color:#1a1300;border-color:var(--gold);font-weight:700}
+.btn.ok{background:var(--ok);color:#03220f;border-color:var(--ok);font-weight:700}
+.btn.no{background:var(--bad);color:#2a0405;border-color:var(--bad);font-weight:700}
+.btn.c1{background:color-mix(in srgb,var(--t1) 30%,var(--deep));border-color:var(--t1)}
+.btn.c2{background:color-mix(in srgb,var(--t2) 30%,var(--deep));border-color:var(--t2)}
+.btn:disabled{opacity:.4;cursor:default}
+.teams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.team{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 12px;background:var(--deep);border:2px solid var(--tc);border-radius:14px;padding:12px 16px;box-shadow:inset 6px 0 0 var(--tc)}
+.team.turn{box-shadow:inset 6px 0 0 var(--tc),0 0 22px color-mix(in srgb,var(--tc) 45%,transparent)}
+.team input{background:transparent;border:1px solid transparent;border-radius:6px;color:var(--ink);font:700 clamp(17px,2vw,22px) Rubik,sans-serif;padding:2px 6px;width:100%}
+.team input:hover{border-color:var(--line)}
+.team .sc{grid-row:span 2;font:400 clamp(30px,4.4vw,52px)/1 "Russo One",sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--tc)}
+.team small{color:var(--mute);font-size:13px;padding-left:7px}
+.team small b{font-weight:500}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#56608f;margin-right:6px;vertical-align:1px}
+.dot.on{background:var(--ok)}
+.team .badge{position:absolute;top:-11px;right:14px;background:var(--gold);color:#1a1300;font-size:12px;font-weight:700;padding:1px 8px;border-radius:6px}
+.board{display:grid;gap:6px;background:var(--deep);padding:6px;border-radius:14px;border:2px solid var(--line);box-shadow:0 0 0 6px rgba(42,69,209,.18)}
+.row{display:grid;grid-template-columns:minmax(0,1.7fr) repeat(5,minmax(0,1fr));gap:6px}
+.cat{background:linear-gradient(180deg,#22389f,#162a86);border-radius:8px;padding:10px 12px;display:flex;align-items:center;font-weight:700;font-size:clamp(14px,1.6vw,20px);line-height:1.15;min-height:72px}
+.cell{background:linear-gradient(180deg,var(--cellhi),var(--cell));border-radius:8px;font:400 clamp(18px,2.8vw,34px) "Russo One",sans-serif;color:var(--gold);min-height:72px;text-shadow:0 2px 0 rgba(0,0,0,.35);transition:transform .12s}
+.cell:hover{transform:translateY(-2px);background:linear-gradient(180deg,#3a58ea,#2338b8)}
+.cell.used{background:#0e1a5c;color:transparent;text-shadow:none;cursor:default;transform:none}
+.done{text-align:center;padding:40px 16px}
+.done h2{font:400 clamp(26px,4vw,44px)/1.1 "Russo One",sans-serif;margin:0 0 8px;color:var(--gold)}
+.done p{color:var(--mute);margin:0 0 20px}
+.hint{color:var(--mute);font-size:14px;margin:14px 0 0}
+.ov{position:fixed;inset:0;background:rgba(3,6,25,.88);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.ov.on{display:flex}
+.card{width:min(1100px,100%);max-height:100%;overflow:auto;background:linear-gradient(180deg,#1d32a8,#101d6e);border:2px solid var(--line);border-radius:16px;padding:clamp(18px,3vw,36px)}
+.card.small{width:min(860px,100%)}
+.qh{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.qh b{font-size:clamp(16px,1.8vw,22px)}
+.qh span{font:400 clamp(24px,3vw,36px) "Russo One",sans-serif;color:var(--gold);white-space:nowrap}
+.qt{font:500 clamp(24px,4vw,48px)/1.2 Rubik,sans-serif;margin:20px 0 22px;text-wrap:balance}
+.buzz{border-radius:12px;padding:14px 18px;margin-bottom:14px;font:400 clamp(20px,2.8vw,34px)/1.15 "Russo One",sans-serif;background:var(--deep);border:2px solid var(--line);color:var(--mute)}
+.buzz.open{border-color:var(--gold);color:var(--gold)}
+.buzz.w1{background:var(--t1);border-color:var(--t1);color:#fff}
+.buzz.w2{background:var(--t2);border-color:var(--t2);color:#00222f}
+.buzz.okk{background:var(--ok);border-color:var(--ok);color:#03220f}
+.timer{height:10px;background:var(--deep);border-radius:6px;overflow:hidden}
+.timer i{display:block;height:100%;width:100%;background:var(--gold);transition:width 1s linear}
+.timer.low i{background:var(--bad)}
+.tl{color:var(--mute);font-size:14px;margin:6px 0 16px;font-variant-numeric:tabular-nums;min-height:21px}
+.ans{display:none;background:var(--deep);border:1px solid var(--gold);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.ans.on{display:block}
+.ans small{display:block;color:var(--mute);font-size:13px}
+.ans div{font:400 clamp(22px,3.2vw,36px)/1.2 "Russo One",sans-serif;color:var(--gold)}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.acts .sp{flex:1}
+.set h2{font:400 26px "Russo One",sans-serif;margin:0 0 6px}
+.set p{color:var(--mute);margin:0 0 14px;font-size:15px}
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:18px}
+.cats label{display:flex;gap:8px;align-items:center;background:var(--deep);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;min-height:44px}
+.cats input{width:18px;height:18px;accent-color:var(--gold);flex:none}
+.cats small{margin-left:auto;color:var(--mute)}
+.field{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.field select{min-height:44px;font:16px Rubik,sans-serif;background:var(--deep);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:0 10px}
+.links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.lk{background:var(--deep);border:2px solid var(--tc);border-radius:14px;padding:16px;text-align:center}
+.lk h3{margin:0 0 10px;font:400 22px "Russo One",sans-serif;color:var(--tc)}
+.lk code{display:block;font-size:13px;color:var(--mute);overflow-wrap:anywhere;margin:10px 0}
+.note{color:var(--mute);font-size:14px;margin:0 0 14px}
+/* phone buzzer */
+body.phone{background:radial-gradient(90% 60% at 50% 40%,color-mix(in srgb,var(--tc) 40%,#0a1240),var(--deep))}
+.ph{min-height:100%;display:grid;grid-template-rows:auto 1fr auto;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));text-align:center;gap:12px;user-select:none;-webkit-user-select:none}
+.ph h2{margin:8px 0 0;font:400 clamp(26px,8vw,40px)/1.1 "Russo One",sans-serif;color:var(--tc)}
+.ph .psc{font:400 20px "Russo One",sans-serif;color:var(--mute);min-height:30px;font-variant-numeric:tabular-nums}
+.bz{place-self:center;width:min(78vw,62vh,420px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--tc) 55%,#fff),var(--tc) 45%,color-mix(in srgb,var(--tc) 55%,#000));box-shadow:0 14px 0 color-mix(in srgb,var(--tc) 40%,#000),0 20px 40px rgba(0,0,0,.5);font:400 clamp(30px,10vw,56px) "Russo One",sans-serif;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.35);touch-action:manipulation;transition:transform .06s,box-shadow .06s,filter .2s}
+.bz:active:not(:disabled){transform:translateY(10px);box-shadow:0 4px 0 color-mix(in srgb,var(--tc) 40%,#000),0 8px 20px rgba(0,0,0,.5)}
+.bz:disabled{filter:grayscale(.85) brightness(.55);cursor:default}
+body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#b8ffd8,var(--ok) 45%,#0b6b3c);box-shadow:0 0 0 12px rgba(47,207,127,.35),0 0 60px var(--ok)}
+.pst{font:400 clamp(22px,7vw,34px)/1.15 "Russo One",sans-serif}
+.pconn{color:var(--mute);font-size:13px}
+.code{color:var(--gold);border-color:var(--gold)}
+.lk code.big{font-size:15px;color:var(--ink);background:#0b1440;border-radius:8px;padding:10px}
+.join{max-width:460px;margin:0 auto;padding:40px 20px;display:grid;gap:12px}
+.join p{color:var(--mute);margin:0}
+.join a{color:var(--gold)}
+.join label{font-weight:500}
+.join input{min-height:64px;font:400 36px "Russo One",sans-serif;text-align:center;letter-spacing:.2em;text-transform:uppercase;background:var(--deep);color:var(--ink);border:2px solid var(--line);border-radius:12px}
+.jt{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.jt .btn{min-height:64px;font-size:18px}
+@media(max-width:600px){
+.row{grid-template-columns:repeat(5,minmax(0,1fr))}
+.cat{grid-column:1/-1;min-height:0;padding:8px 10px}
+.cell{min-height:52px}
+.tools{margin-left:0;width:100%}
+.tools .btn{flex:1;padding:0 10px}
+.teams,.links{grid-template-columns:minmax(0,1fr)}
+}
+@media(prefers-reduced-motion:reduce){.cell,.timer i,.bz{transition:none}}
+</style>
+</head>
+<body>
+<div id="hostView" hidden>
+<div class="wrap">
+  <div class="top">
+    <h1>Своя <span>викторина</span></h1>
+    <div class="round" id="roundLbl">Загрузка…</div>
+    <div class="round code" id="codeLbl" title="Код игры для пультов"></div>
+    <div class="tools">
+      <button class="btn gold" id="linkBtn" type="button">Пульты команд</button>
+      <button class="btn" id="setBtn" type="button">Категории</button>
+      <button class="btn" id="undoBtn" type="button">Отменить</button>
+      <button class="btn" id="newBtn" type="button">Новая игра</button>
+    </div>
+  </div>
+  <div class="teams" id="teams"></div>
+  <div id="board"></div>
+  <p class="hint">Выбирает команда с золотой меткой. Кто первым нажал на пульт, тот и отвечает. За ошибку очки не снимаются, но право ответа переходит соперникам. Клавиши: <b>1</b>/<b>2</b> — отдать ответ команде вручную, пробел — показать ответ, Esc — вернуть вопрос на табло.</p>
+</div>
+</div>
+
+<div class="ov" id="qOv" role="dialog" aria-modal="true" aria-labelledby="qText">
+  <div class="card">
+    <div class="qh"><b id="qCat"></b><span id="qVal"></span></div>
+    <div class="qt" id="qText"></div>
+    <div class="buzz" id="buzz" aria-live="assertive"></div>
+    <div class="timer" id="timer"><i id="timerBar"></i></div>
+    <div class="tl" id="timerLbl"></div>
+    <div class="ans" id="ans"><small>Правильный ответ</small><div id="ansText"></div></div>
+    <div class="acts" id="acts"></div>
+  </div>
+</div>
+
+<div class="ov" id="lOv" role="dialog" aria-modal="true" aria-labelledby="lTitle">
+  <div class="card small set">
+    <h2 id="lTitle">Пульты команд</h2>
+    <p>Отправьте каждой команде её ссылку и откройте её на одном телефоне. На телефоне появится большая кнопка, а здесь будет видно, кто нажал первым. Вход никуда не нужен.</p>
+    <div class="links" id="links"></div>
+    <p class="note" id="manual"></p>
+    <div class="acts"><button class="btn" id="newCode" type="button">Сменить код игры</button><span class="sp"></span><button class="btn gold" id="lClose" type="button">Готово</button></div>
+  </div>
+</div>
+
+<div class="ov" id="sOv" role="dialog" aria-modal="true" aria-labelledby="sTitle">
+  <div class="card small set">
+    <h2 id="sTitle">Категории</h2>
+    <p id="sInfo">По 5 категорий в раунде.</p>
+    <div class="cats" id="cats"></div>
+    <div class="field">
+      <label for="timerSel">Время на вопрос</label>
+      <select id="timerSel">
+        <option value="0">Без таймера</option>
+        <option value="15">15 секунд</option>
+        <option value="20">20 секунд</option>
+        <option value="30">30 секунд</option>
+        <option value="45">45 секунд</option>
+        <option value="60">60 секунд</option>
+      </select>
+    </div>
+    <div class="acts">
+      <button class="btn" id="allBtn" type="button">Выбрать все</button>
+      <button class="btn" id="shufBtn" type="button">Перемешать</button>
+      <button class="btn" id="resetSeen" type="button">Сбросить сыгранные</button>
+      <span class="sp"></span>
+      <button class="btn" id="sClose" type="button">Закрыть</button>
+      <button class="btn gold" id="sApply" type="button">Новая игра с этими темами</button>
+    </div>
+  </div>
+</div>
+
+<div id="phoneView" class="ph" hidden>
+  <div><h2 id="pTeam">Команда</h2><div class="psc" id="pScore"></div></div>
+  <button class="bz" id="bz" type="button" disabled>ЖМИ</button>
+  <div><div class="pst" id="pState" aria-live="assertive">Подключение…</div><div class="pconn" id="pConn"></div></div>
+</div>
+
+<div id="joinView" class="join" hidden>
+  <h1>Своя <span>викторина</span></h1>
+  <p>Введите код игры с экрана ведущего и выберите свою команду.</p>
+  <label for="jCode">Код игры</label>
+  <input id="jCode" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD">
+  <div class="jt"><button class="btn c1" type="button" data-join="1">Команда 1</button><button class="btn c2" type="button" data-join="2">Команда 2</button></div>
+  <p><a href="./">Я ведущий — открыть табло</a></p>
+</div>
+
+<script>
+{
+const BROKER=new URLSearchParams(location.search).get("broker")||"wss://broker.emqx.io:8084/mqtt";
+const BASE=[100,200,300,400,500],PER=5,KEY="svoya-quiz-teams-v3";
+const ABC="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rnd=n=>Array.from({length:n},()=>ABC[Math.floor(Math.random()*ABC.length)]).join("");
+const P=new URLSearchParams(location.search);
+const topic=room=>"svoyaviktorina/v1/"+room;
+const SITE=location.origin+location.pathname;
+const parse=b=>{try{return JSON.parse(b.toString())}catch(e){return null}};
+function connect(onUp,onDown){
+  if(!window.mqtt){onDown("Не загрузилась библиотека связи");return null}
+  const c=mqtt.connect(BROKER,{clientId:"sv_"+rnd(10),clean:true,connectTimeout:8000,reconnectPeriod:2000,keepalive:20});
+  c.on("connect",onUp);
+  c.on("reconnect",()=>onDown("Переподключение…"));
+  c.on("offline",()=>onDown("Нет связи…"));
+  c.on("error",()=>onDown("Ошибка связи…"));
+  return c;
+}
+
+/* ---------- join screen ---------- */
+function join(){
+  $("joinView").hidden=false;
+  const inp=$("jCode");inp.value=(P.get("room")||"").toUpperCase();
+  document.addEventListener("click",e=>{
+    const b=e.target.closest("[data-join]");if(!b)return;
+    const code=inp.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if(code.length!==4){inp.focus();inp.style.borderColor="var(--bad)";return}
+    location.href=SITE+"?room="+code+"&team="+b.dataset.join;
+  });
+}
+
+/* ---------- phone buzzer ---------- */
+function phone(team,room){
+  document.body.className="phone";
+  document.body.style.setProperty("--tc",team===1?"var(--t1)":"var(--t2)");
+  $("phoneView").hidden=false;
+  const bz=$("bz"),st=$("pState"),T=topic(room);
+  let H=null,lastAt=0,pressed=null,up=false;
+  try{navigator.wakeLock&&navigator.wakeLock.request("screen").catch(()=>{})}catch(e){}
+  const draw=()=>{
+    const live=H&&Date.now()-lastAt<20000;
+    let s="Ждём вопрос",cls="wait",can=false,label="ЖМИ";
+    $("pTeam").textContent=(H&&H.n&&H.n[team-1])||("Команда "+team);
+    $("pScore").textContent=H&&H.s?("Счёт "+H.s[team-1]+" : "+H.s[2-team]):"";
+    if(!up)s="Подключение…";
+    else if(!live)s="Ждём экран ведущего (код "+room+")";
+    else if(!H.tok)s="Ждём вопрос";
+    else if(H.win===team){s="Вы отвечаете!";cls="win";label="ВЫ!"}
+    else if(H.win){s="Отвечает соперник";cls="lose"}
+    else if((H.bl||[]).includes(team)){s="Ваша команда уже отвечала";cls="lose"}
+    else if(H.open){if(pressed===H.tok){s="Нажато! Ждём…";cls="sent"}else{s="Жмите, если знаете ответ!";cls="go";can=true}}
+    else s="Время вышло";
+    st.textContent=s;bz.textContent=label;document.body.dataset.st=cls;bz.disabled=!can;
+  };
+  const c=connect(()=>{
+    up=true;$("pConn").textContent="Пульт на связи · код "+room;
+    c.subscribe(T+"/state",{qos:1});
+    hello();draw();
+  },msg=>{up=false;$("pConn").textContent=msg;draw()});
+  if(!c){st.textContent="Не удалось загрузить страницу полностью. Обновите её.";return}
+  const hello=()=>{if(up)c.publish(T+"/hello",JSON.stringify({team}),{qos:0})};
+  c.on("message",(tp,b)=>{if(tp===T+"/state"){const d=parse(b);if(d){H=d;lastAt=Date.now();draw()}}});
+  setInterval(()=>{hello();draw()},4000);
+  bz.addEventListener("pointerdown",e=>{
+    e.preventDefault();
+    if(bz.disabled||!up||!H||!H.tok)return;
+    pressed=H.tok;
+    c.publish(T+"/buzz",JSON.stringify({team,tok:H.tok}),{qos:1});
+    try{navigator.vibrate&&navigator.vibrate(80)}catch(err){}
+    draw();
+  });
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){hello();draw()}});
+  draw();
+}
+
+/* ---------- host / presentation ---------- */
+async function host(){
+  $("hostView").hidden=false;
+  let DB=null,cur=null,tick=null,left=0,actx=null,client=null,up=false;
+  const seenAt={1:0,2:0};
+  const fresh=o=>({room:o&&o.room||rnd(4),teams:o?o.teams.map(t=>({name:t.name,score:0})):[{name:"Команда 1",score:0},{name:"Команда 2",score:0}],sel:o?o.sel:[0,1,2,3,4,5,6,7,8,9],timer:o?o.timer:30,round:0,board:null,used:{},chooser:0,log:[],seen:o?o.seen:{}});
+  let S=null;
+  try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+  if(!S||!S.teams||!S.sel)S=fresh();
+  if(!S.room)S.room=rnd(4);
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+  const T=()=>topic(S.room);
+  const nR=()=>Math.max(1,Math.ceil(S.board.length/PER));
+  const rowsOf=r=>S.board.slice(r*PER,r*PER+PER).map((b,j)=>({g:r*PER+j,c:b[0],q:b[1]}));
+  const left5=r=>rowsOf(r).reduce((n,x)=>n+BASE.filter((_,i)=>!S.used[x.g+"-"+i]).length,0);
+  const tok=()=>rnd(8);
+  const tName=t=>S.teams[t-1].name||("Команда "+t);
+  const link=t=>SITE+"?room="+S.room+"&team="+t;
+  const online=t=>Date.now()-seenAt[t]<12000;
+
+  function pick(c,l){
+    const all=DB.cats[c].q.map((q,i)=>q[0]===l?i:-1).filter(i=>i>=0);
+    let free=all.filter(i=>!S.seen[c+"-"+i]);
+    if(!free.length){all.forEach(i=>delete S.seen[c+"-"+i]);free=all}
+    const i=free[Math.floor(Math.random()*free.length)];S.seen[c+"-"+i]=1;return i;
+  }
+  function deal(){S.board=S.sel.map(c=>[c,[1,2,3,4,5].map(l=>pick(c,l))]);save()}
+  function beep(f,d){try{actx=actx||new AudioContext();const o=actx.createOscillator(),g=actx.createGain();o.type="square";o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.12,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.start();o.stop(actx.currentTime+d)}catch(e){}}
+
+  function pub(){
+    if(!client||!up)return;
+    const st={tok:cur&&!cur.done?cur.tok:null,open:!!(cur&&cur.open&&!cur.win&&!cur.done),win:cur&&!cur.done?cur.win:0,bl:cur?cur.bl:[],n:S.teams.map(t=>t.name.slice(0,40)),s:S.teams.map(t=>t.score)};
+    client.publish(T()+"/state",JSON.stringify(st),{qos:1,retain:true});
+  }
+  function startLink(){
+    if(client){try{client.end(true)}catch(e){}}
+    up=false;
+    client=connect(()=>{up=true;client.subscribe([T()+"/buzz",T()+"/hello"],{qos:1});pub();dots()},()=>{up=false;dots()});
+    if(!client)return;
+    client.on("message",(tp,b)=>{
+      const d=parse(b);if(!d||(d.team!==1&&d.team!==2))return;
+      if(tp===T()+"/hello"){const was=online(d.team);seenAt[d.team]=Date.now();if(!was)dots()}
+      else if(tp===T()+"/buzz"){seenAt[d.team]=Date.now();if(cur&&cur.open&&!cur.win&&!cur.done&&d.tok===cur.tok&&!cur.bl.includes(d.team))setWin(d.team)}
+    });
+  }
+  function dots(){
+    [1,2].forEach(t=>{
+      const txt=!up?"Нет связи с сервером":online(t)?"Пульт подключён":"Пульт не подключён";
+      document.querySelectorAll('[data-st="'+t+'"]').forEach(el=>{el.innerHTML='<span class="dot'+(up&&online(t)?" on":"")+'"></span>'+esc(txt)});
+    });
+    $("codeLbl").textContent="Код игры: "+S.room;
+  }
+
+  function renderTeams(){
+    $("teams").innerHTML=S.teams.map((t,k)=>'<div class="team'+(k===S.chooser?" turn":"")+'" style="--tc:var(--t'+(k+1)+')">'+(k===S.chooser?'<span class="badge">Выбирает вопрос</span>':'')+
+      '<input id="tn'+k+'" data-t="'+k+'" value="'+esc(t.name)+'" maxlength="30" aria-label="Название команды '+(k+1)+'"><div class="sc">'+t.score+'</div>'+
+      '<small data-st="'+(k+1)+'"></small></div>').join("");
+    dots();
+  }
+  function render(){
+    if(!DB)return;
+    if(!S.board)deal();
+    const r=S.round;
+    $("roundLbl").textContent="Раунд "+(r+1)+" из "+nR();
+    $("undoBtn").disabled=!S.log.length;
+    renderTeams();
+    let h;
+    if(left5(r)>0){
+      h='<div class="board">'+rowsOf(r).map(x=>'<div class="row"><div class="cat">'+esc(DB.cats[x.c].name)+'</div>'+
+        BASE.map((v,i)=>{const u=S.used[x.g+"-"+i],val=v*(r+1);return '<button type="button" class="cell'+(u?" used":"")+'" data-g="'+x.g+'" data-i="'+i+'"'+(u?' disabled aria-label="Сыграно"':' aria-label="'+esc(DB.cats[x.c].name)+", "+val+'"')+'>'+val+'</button>'}).join("")+'</div>').join("")+'</div>';
+    }else if(r<nR()-1){
+      h='<div class="board done"><h2>Раунд '+(r+1)+' сыгран</h2><p>Счёт '+S.teams[0].score+' : '+S.teams[1].score+'. В следующем раунде цены удваиваются.</p><button class="btn gold" type="button" id="nextBtn">Следующий раунд</button></div>';
+    }else{
+      const a=S.teams[0].score,b=S.teams[1].score;
+      $("roundLbl").textContent="Игра окончена";
+      h='<div class="board done"><h2>'+(a===b?"Ничья!":"Победила команда «"+esc(a>b?tName(1):tName(2))+"»")+'</h2><p>Итоговый счёт '+a+' : '+b+'</p><button class="btn gold" type="button" id="againBtn">Новая игра</button></div>';
+    }
+    $("board").innerHTML=h;
+    save();pub();
+  }
+
+  function drawTimer(){
+    const t=S.timer,show=t&&cur&&!cur.done;
+    $("timer").style.visibility=show?"":"hidden";
+    $("timerLbl").textContent=!show?"":cur.win?"Таймер на паузе — команда отвечает":left>0?"Осталось "+left+" с":"Время вышло";
+    $("timerBar").style.width=t?(Math.max(0,left)/t*100)+"%":"0";
+    $("timer").classList.toggle("low",!!t&&left<=5);
+  }
+  function startTick(){
+    clearInterval(tick);
+    if(!S.timer)return;
+    tick=setInterval(()=>{
+      if(!cur||cur.done||cur.win||!cur.open)return;
+      left--;
+      if(left<=0){cur.open=false;beep(220,.6);drawQ();pub()}
+      drawTimer();
+    },1000);
+  }
+  function openQ(g,i){
+    const b=S.board[g],q=DB.cats[b[0]].q[b[1][i]];
+    cur={g,i,r:S.round,val:BASE[i]*(S.round+1),tok:tok(),open:true,win:0,bl:[],done:0,ok:0,rev:false,cat:DB.cats[b[0]].name,q:q[1],a:q[2]};
+    left=S.timer;
+    $("qCat").textContent=cur.cat;$("qVal").textContent=cur.val;
+    $("qText").textContent=cur.q;$("ansText").textContent=cur.a;
+    $("qOv").classList.add("on");
+    drawQ();startTick();pub();
+  }
+  function drawQ(){
+    if(!cur)return;
+    const bz=$("buzz");let txt,cls="";
+    if(cur.done&&cur.ok){txt="Верно! +"+cur.val+" — «"+tName(cur.ok)+"»";cls="okk"}
+    else if(cur.done)txt="Никто не ответил";
+    else if(cur.win){txt="Отвечает: «"+tName(cur.win)+"»";cls="w"+cur.win}
+    else if(!cur.open)txt="Время вышло";
+    else if(cur.bl.length){txt="«"+tName(cur.bl[0])+"» ошиблась — отвечает соперник, жмите!";cls="open"}
+    else{txt="Кнопки открыты — жмите, если знаете!";cls="open"}
+    bz.textContent=txt;bz.className="buzz "+cls;
+    $("ans").classList.toggle("on",cur.rev);
+    let a="";
+    if(!cur.done&&cur.win)a+='<button class="btn ok" type="button" data-act="ok">Верно +'+cur.val+'</button><button class="btn no" type="button" data-act="no">Неверно</button>';
+    else if(!cur.done)[1,2].forEach(t=>{if(!cur.bl.includes(t))a+='<button class="btn c'+t+'" type="button" data-act="w'+t+'">Отвечает «'+esc(tName(t))+'»</button>'});
+    a+='<span class="sp"></span>';
+    if(!cur.rev)a+='<button class="btn gold" type="button" data-act="rev">Показать ответ</button>';
+    a+=cur.done?'<button class="btn gold" type="button" data-act="close">К табло</button>':'<button class="btn" type="button" data-act="back">Вернуть на табло</button><button class="btn" type="button" data-act="none">Никто не ответил</button>';
+    $("acts").innerHTML=a;
+    drawTimer();
+  }
+  function setWin(t){
+    if(!cur||cur.done||cur.win||cur.bl.includes(t))return;
+    cur.win=t;cur.open=false;beep(t===1?660:880,.35);drawQ();pub();
+  }
+  function markNone(){
+    if(!cur.done){const key=cur.g+"-"+cur.i;S.used[key]=1;S.log.push({t:0,d:0,key,ch:S.chooser,r:cur.r})}
+    cur.done=1;cur.rev=true;cur.win=0;
+  }
+  function judge(ok){
+    if(!cur||!cur.win||cur.done)return;
+    const t=cur.win,key=cur.g+"-"+cur.i;
+    if(ok){
+      S.teams[t-1].score+=cur.val;
+      S.log.push({t,d:cur.val,key,ch:S.chooser,r:cur.r});
+      S.used[key]=1;S.chooser=t-1;cur.done=1;cur.ok=t;cur.rev=true;beep(1046,.25);
+    }else{
+      cur.bl.push(t);cur.win=0;beep(160,.4);
+      if(cur.bl.length>=2)markNone();else{cur.tok=tok();cur.open=left>0||!S.timer}
+    }
+    drawQ();render();
+  }
+  function closeQ(){clearInterval(tick);cur=null;$("qOv").classList.remove("on");render()}
+  function undo(){
+    const e=S.log.pop();if(!e)return;
+    if(e.t)S.teams[e.t-1].score-=e.d;
+    delete S.used[e.key];S.chooser=e.ch;S.round=e.r;render();
+  }
+
+  function openLinks(){
+    $("links").innerHTML=[1,2].map(t=>'<div class="lk" style="--tc:var(--t'+t+')"><h3>'+esc(tName(t))+'</h3><code class="big">'+esc(link(t))+'</code><div class="acts" style="justify-content:center"><button class="btn" type="button" data-copy="'+t+'">Скопировать ссылку</button></div><p class="note" style="margin:10px 0 0" data-st="'+t+'"></p></div>').join("");
+    $("manual").textContent="Или откройте на телефоне "+SITE+"?join, введите код "+S.room+" и выберите команду.";
+    dots();$("lOv").classList.add("on");
+  }
+
+  let draft=[];
+  function drawCats(){
+    $("cats").innerHTML=DB.cats.map((c,i)=>{const k=draft.indexOf(i);return '<label><input type="checkbox" id="cat'+i+'" data-cat="'+i+'"'+(k>=0?" checked":"")+'>'+esc(c.name)+(k>=0?'<small>раунд '+(Math.floor(k/PER)+1)+'</small>':'')+'</label>'}).join("");
+    $("sInfo").textContent="По 5 категорий в раунде. В базе "+DB.cats.reduce((n,c)=>n+c.q.length,0)+" вопросов, уже выпадало "+Object.keys(S.seen).length+". Сыгранные вопросы не повторяются, пока не закончатся.";
+    $("sApply").disabled=!draft.length;
+  }
+
+  document.addEventListener("click",e=>{
+    const t=e.target.closest("button,input[type=checkbox]");if(!t)return;
+    if(t.matches(".cell:not(.used)"))return openQ(+t.dataset.g,+t.dataset.i);
+    if(t.dataset.act){const a=t.dataset.act;
+      if(a==="ok")judge(true);else if(a==="no")judge(false);
+      else if(a==="w1")setWin(1);else if(a==="w2")setWin(2);
+      else if(a==="rev"){cur.rev=true;drawQ()}
+      else if(a==="none"){markNone();drawQ();render()}
+      else if(a==="back"||a==="close")closeQ();
+      return;
+    }
+    if(t.dataset.copy){const u=link(t.dataset.copy);try{navigator.clipboard.writeText(u).then(()=>{t.textContent="Скопировано"},()=>{t.textContent="Скопируйте вручную"})}catch(err){t.textContent="Скопируйте вручную"}return}
+    if(t.dataset.cat!==undefined){const i=+t.dataset.cat;t.checked?draft.push(i):draft.splice(draft.indexOf(i),1);drawCats();return}
+    switch(t.id){
+      case "nextBtn":S.round++;render();break;
+      case "againBtn":case "newBtn":S=fresh(S);deal();render();break;
+      case "undoBtn":undo();break;
+      case "linkBtn":openLinks();break;
+      case "lClose":$("lOv").classList.remove("on");break;
+      case "newCode":S.room=rnd(4);save();seenAt[1]=seenAt[2]=0;startLink();openLinks();break;
+      case "setBtn":draft=S.sel.slice();$("timerSel").value=String(S.timer);drawCats();$("sOv").classList.add("on");break;
+      case "sClose":$("sOv").classList.remove("on");break;
+      case "allBtn":draft=DB.cats.map((_,i)=>i);drawCats();break;
+      case "shufBtn":for(let i=draft.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[draft[i],draft[j]]=[draft[j],draft[i]]}drawCats();break;
+      case "resetSeen":S.seen={};save();drawCats();break;
+      case "sApply":{const tm=+$("timerSel").value;S=fresh(S);S.sel=draft.slice();S.timer=tm;deal();$("sOv").classList.remove("on");render();break}
+    }
+  });
+  document.addEventListener("input",e=>{const k=e.target.dataset.t;if(k!==undefined){S.teams[+k].name=e.target.value;save();pub()}});
+  $("timerSel").addEventListener("change",e=>{S.timer=+e.target.value;save()});
+  document.addEventListener("keydown",e=>{
+    if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
+    if(cur){
+      if(e.key==="1")setWin(1);else if(e.key==="2")setWin(2);
+      else if(e.key===" "){e.preventDefault();cur.rev=true;drawQ()}
+      else if(e.key==="Escape")closeQ();
+    }else if(e.key==="Escape"){$("sOv").classList.remove("on");$("lOv").classList.remove("on")}
+  });
+  setInterval(()=>{dots();pub()},5000);
+
+  startLink();
+  try{const res=await fetch("questions.json");DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
+  if(S.board&&S.board.some(b=>!DB.cats[b[0]]))S=fresh(S);
+  render();
+}
+
+const team=+P.get("team"),room=(P.get("room")||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+if((team===1||team===2)&&room.length===4)phone(team,room);
+else if(P.has("join")||P.has("room")||P.has("team"))join();
+else host();
+}
+</script>
+</body>
+</html>
