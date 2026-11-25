@@ -251,12 +251,11 @@ function phone(team,room){
   let H=null,lastAt=0,pressed=null,up=false;
   try{navigator.wakeLock&&navigator.wakeLock.request("screen").catch(()=>{})}catch(e){}
   const draw=()=>{
-    const live=H&&Date.now()-lastAt<20000;
     let s="Ждём вопрос",cls="wait",can=false,label="ЖМИ";
     $("pTeam").textContent=(H&&H.n&&H.n[team-1])||("Команда "+team);
     $("pScore").textContent=H&&H.s?("Счёт "+H.s[team-1]+" : "+H.s[2-team]):"";
     if(!up)s="Подключение…";
-    else if(!live)s="Ждём экран ведущего (код "+room+")";
+    else if(!H)s="Ждём экран ведущего (код "+room+")";
     else if(!H.tok)s="Ждём вопрос";
     else if(H.win===team){s="Вы отвечаете!";cls="win";label="ВЫ!"}
     else if(H.win){s="Отвечает соперник";cls="lose"}
@@ -304,7 +303,7 @@ async function host(){
   const tok=()=>rnd(8);
   const tName=t=>S.teams[t-1].name||("Команда "+t);
   const link=t=>SITE+"?room="+S.room+"&team="+t;
-  const online=t=>Date.now()-seenAt[t]<12000;
+  const online=t=>Date.now()-seenAt[t]<70000;
 
   function pick(c,l){
     const all=DB.cats[c].q.map((q,i)=>q[0]===l?i:-1).filter(i=>i>=0);
@@ -327,7 +326,7 @@ async function host(){
     if(!client)return;
     client.on("message",(tp,b)=>{
       const d=parse(b);if(!d||(d.team!==1&&d.team!==2))return;
-      if(tp===T()+"/hello"){const was=online(d.team);seenAt[d.team]=Date.now();if(!was)dots()}
+      if(tp===T()+"/hello"){const was=online(d.team);seenAt[d.team]=Date.now();if(!was){dots();pub()}}
       else if(tp===T()+"/buzz"){seenAt[d.team]=Date.now();if(cur&&cur.open&&!cur.win&&!cur.done&&d.tok===cur.tok&&!cur.bl.includes(d.team))setWin(d.team)}
     });
   }
