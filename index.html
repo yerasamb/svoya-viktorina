@@ -64,6 +64,11 @@ h1 span{color:var(--gold)}
 .qh b{font-size:clamp(16px,1.8vw,22px)}
 .qh span{font:400 clamp(24px,3vw,36px) "Russo One",sans-serif;color:var(--gold);white-space:nowrap}
 .qt{font:500 clamp(24px,4vw,48px)/1.2 Rubik,sans-serif;margin:20px 0 22px;text-wrap:balance}
+.qimg{display:block;max-width:min(100%,520px);max-height:min(40vh,380px);margin:18px auto 0;border-radius:6px;box-shadow:0 0 0 1px rgba(255,255,255,.25),0 12px 30px rgba(0,0,0,.45)}
+.buzz.fs{border-color:var(--bad);color:#ffb3b5}
+.btn.big{min-height:56px;padding:0 26px;font-size:18px}
+.team .sc.neg{color:var(--bad)}
+body[data-st=read] .bz{filter:grayscale(.75) brightness(.7)}
 .buzz{border-radius:12px;padding:14px 18px;margin-bottom:14px;font:400 clamp(20px,2.8vw,34px)/1.15 "Russo One",sans-serif;background:var(--deep);border:2px solid var(--line);color:var(--mute)}
 .buzz.open{border-color:var(--gold);color:var(--gold)}
 .buzz.w1{background:var(--t1);border-color:var(--t1);color:#fff}
@@ -139,13 +144,14 @@ body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#
   </div>
   <div class="teams" id="teams"></div>
   <div id="board"></div>
-  <p class="hint">Выбирает команда с золотой меткой. Кто первым нажал на пульт, тот и отвечает. За ошибку очки не снимаются, но право ответа переходит соперникам. Клавиши: <b>1</b>/<b>2</b> — отдать ответ команде вручную, пробел — показать ответ, Esc — вернуть вопрос на табло.</p>
+  <p class="hint">Выбирает команда с золотой меткой. Ведущий читает вопрос и открывает кнопки (<b>Enter</b>); кто нажал раньше — фальстарт и блокировка кнопки. Отвечает тот, кто первым нажал после открытия. Верно — плюс цена вопроса, неверно — минус, и право ответа у соперников. Клавиши: <b>1</b>/<b>2</b> — отдать ответ вручную, пробел — показать ответ, Esc — вернуть вопрос на табло.</p>
 </div>
 </div>
 
 <div class="ov" id="qOv" role="dialog" aria-modal="true" aria-labelledby="qText">
   <div class="card">
     <div class="qh"><b id="qCat"></b><span id="qVal"></span></div>
+    <img class="qimg" id="qImg" alt="Картинка к вопросу" hidden>
     <div class="qt" id="qText"></div>
     <div class="buzz" id="buzz" aria-live="assertive"></div>
     <div class="timer" id="timer"><i id="timerBar"></i></div>
@@ -179,6 +185,25 @@ body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#
         <option value="30">30 секунд</option>
         <option value="45">45 секунд</option>
         <option value="60">60 секунд</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="atimeSel">Время на ответ после нажатия</label>
+      <select id="atimeSel">
+        <option value="0">Без ограничения</option>
+        <option value="5">5 секунд</option>
+        <option value="10">10 секунд</option>
+        <option value="15">15 секунд</option>
+        <option value="20">20 секунд</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fsSel">Штраф за фальстарт</label>
+      <select id="fsSel">
+        <option value="2">Блок кнопки на 2 секунды</option>
+        <option value="3">Блок кнопки на 3 секунды</option>
+        <option value="5">Блок кнопки на 5 секунд</option>
+        <option value="-1">Без права ответа на этот вопрос</option>
       </select>
     </div>
     <div class="acts">
@@ -217,7 +242,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const rnd=n=>Array.from({length:n},()=>ABC[Math.floor(Math.random()*ABC.length)]).join("");
 const P=new URLSearchParams(location.search);
-const topic=room=>"svoyaviktorina/v1/"+room;
+const topic=room=>"svoyaviktorina/v2/"+room;
 const SITE=location.origin+location.pathname;
 const parse=b=>{try{return JSON.parse(b.toString())}catch(e){return null}};
 function connect(onUp,onDown){
@@ -248,37 +273,42 @@ function phone(team,room){
   document.body.style.setProperty("--tc",team===1?"var(--t1)":"var(--t2)");
   $("phoneView").hidden=false;
   const bz=$("bz"),st=$("pState"),T=topic(room);
-  let H=null,lastAt=0,pressed=null,up=false;
+  let H=null,pressed=null,fsTok=null,up=false;
   try{navigator.wakeLock&&navigator.wakeLock.request("screen").catch(()=>{})}catch(e){}
+  const mode=()=>{
+    if(!up)return["Подключение…","wait",0];
+    if(!H)return["Ждём экран ведущего (код "+room+")","wait",0];
+    if(!H.tok||H.ph==="idle")return["Ждём вопрос","wait",0];
+    if(H.win===team)return["Вы отвечаете!","win",0];
+    if(H.win)return["Отвечает соперник","lose",0];
+    if((H.bl||[]).includes(team))return["Ваша команда ответила неверно","lose",0];
+    if((H.lk||[]).includes(team))return["Фальстарт! Кнопка заблокирована","lose",0];
+    if(H.ph==="read")return fsTok===H.tok?["Фальстарт! Вы нажали раньше времени","lose",0]:["Слушайте вопрос — пока не жмите!","read",1];
+    if(H.ph==="open")return pressed===H.tok?["Нажато! Ждём…","sent",0]:["Жмите, если знаете ответ!","go",1];
+    return["Время вышло","wait",0];
+  };
   const draw=()=>{
-    let s="Ждём вопрос",cls="wait",can=false,label="ЖМИ";
     $("pTeam").textContent=(H&&H.n&&H.n[team-1])||("Команда "+team);
     $("pScore").textContent=H&&H.s?("Счёт "+H.s[team-1]+" : "+H.s[2-team]):"";
-    if(!up)s="Подключение…";
-    else if(!H)s="Ждём экран ведущего (код "+room+")";
-    else if(!H.tok)s="Ждём вопрос";
-    else if(H.win===team){s="Вы отвечаете!";cls="win";label="ВЫ!"}
-    else if(H.win){s="Отвечает соперник";cls="lose"}
-    else if((H.bl||[]).includes(team)){s="Ваша команда уже отвечала";cls="lose"}
-    else if(H.open){if(pressed===H.tok){s="Нажато! Ждём…";cls="sent"}else{s="Жмите, если знаете ответ!";cls="go";can=true}}
-    else s="Время вышло";
-    st.textContent=s;bz.textContent=label;document.body.dataset.st=cls;bz.disabled=!can;
+    const[s,cls,can]=mode();
+    st.textContent=s;document.body.dataset.st=cls;bz.disabled=!can;
+    bz.textContent=cls==="win"?"ВЫ!":cls==="read"?"ЖДИ":"ЖМИ";
   };
   const c=connect(()=>{
     up=true;$("pConn").textContent="Пульт на связи · код "+room;
-    c.subscribe(T+"/state",{qos:1});
-    hello();draw();
+    c.subscribe(T+"/state",{qos:1});hello();draw();
   },msg=>{up=false;$("pConn").textContent=msg;draw()});
-  if(!c){st.textContent="Не удалось загрузить страницу полностью. Обновите её.";return}
+  if(!c){st.textContent="Страница загрузилась не полностью. Обновите её.";return}
   const hello=()=>{if(up)c.publish(T+"/hello",JSON.stringify({team}),{qos:0})};
-  c.on("message",(tp,b)=>{if(tp===T+"/state"){const d=parse(b);if(d){H=d;lastAt=Date.now();draw()}}});
-  setInterval(()=>{hello();draw()},4000);
+  c.on("message",(tp,b)=>{if(tp===T+"/state"){const d=parse(b);if(d){H=d;draw()}}});
+  setInterval(hello,4000);
   bz.addEventListener("pointerdown",e=>{
     e.preventDefault();
     if(bz.disabled||!up||!H||!H.tok)return;
-    pressed=H.tok;
-    c.publish(T+"/buzz",JSON.stringify({team,tok:H.tok}),{qos:1});
-    try{navigator.vibrate&&navigator.vibrate(80)}catch(err){}
+    const ph=H.ph;
+    if(ph==="read")fsTok=H.tok;else pressed=H.tok;
+    c.publish(T+"/buzz",JSON.stringify({team,tok:H.tok,ph}),{qos:1});
+    try{navigator.vibrate&&navigator.vibrate(ph==="read"?[60,60,60]:80)}catch(err){}
     draw();
   });
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){hello();draw()}});
@@ -288,13 +318,15 @@ function phone(team,room){
 /* ---------- host / presentation ---------- */
 async function host(){
   $("hostView").hidden=false;
-  let DB=null,cur=null,tick=null,left=0,actx=null,client=null,up=false;
+  let DB=null,cur=null,tick=null,left=0,aLeft=0,actx=null,client=null,up=false,lockTimer=null;
   const seenAt={1:0,2:0};
-  const fresh=o=>({room:o&&o.room||rnd(4),teams:o?o.teams.map(t=>({name:t.name,score:0})):[{name:"Команда 1",score:0},{name:"Команда 2",score:0}],sel:o?o.sel:[0,1,2,3,4,5,6,7,8,9],timer:o?o.timer:30,round:0,board:null,used:{},chooser:0,log:[],seen:o?o.seen:{}});
+  const fresh=o=>({room:o&&o.room||rnd(4),teams:o?o.teams.map(t=>({name:t.name,score:0})):[{name:"Команда 1",score:0},{name:"Команда 2",score:0}],sel:o?o.sel:[0,1,2,3,4,5,6,7,8,9],timer:o?o.timer:30,atime:o&&o.atime!=null?o.atime:10,fsPen:o&&o.fsPen!=null?o.fsPen:3,round:0,board:null,used:{},chooser:0,log:[],seen:o?o.seen:{}});
   let S=null;
   try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
   if(!S||!S.teams||!S.sel)S=fresh();
   if(!S.room)S.room=rnd(4);
+  if(S.atime==null)S.atime=10;
+  if(S.fsPen==null)S.fsPen=3;
   const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
   const T=()=>topic(S.room);
   const nR=()=>Math.max(1,Math.ceil(S.board.length/PER));
@@ -304,6 +336,7 @@ async function host(){
   const tName=t=>S.teams[t-1].name||("Команда "+t);
   const link=t=>SITE+"?room="+S.room+"&team="+t;
   const online=t=>Date.now()-seenAt[t]<70000;
+  const locked=t=>!!(cur&&cur.lock[t]&&Date.now()<cur.lock[t]);
 
   function pick(c,l){
     const all=DB.cats[c].q.map((q,i)=>q[0]===l?i:-1).filter(i=>i>=0);
@@ -311,13 +344,28 @@ async function host(){
     if(!free.length){all.forEach(i=>delete S.seen[c+"-"+i]);free=all}
     const i=free[Math.floor(Math.random()*free.length)];S.seen[c+"-"+i]=1;return i;
   }
-  function deal(){S.board=S.sel.map(c=>[c,[1,2,3,4,5].map(l=>pick(c,l))]);save()}
+  function deal(){S.board=S.sel.filter(c=>DB.cats[c]).map(c=>[c,[1,2,3,4,5].map(l=>pick(c,l))]);save()}
   function beep(f,d){try{actx=actx||new AudioContext();const o=actx.createOscillator(),g=actx.createGain();o.type="square";o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.12,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.start();o.stop(actx.currentTime+d)}catch(e){}}
 
   function pub(){
     if(!client||!up)return;
-    const st={tok:cur&&!cur.done?cur.tok:null,open:!!(cur&&cur.open&&!cur.win&&!cur.done),win:cur&&!cur.done?cur.win:0,bl:cur?cur.bl:[],n:S.teams.map(t=>t.name.slice(0,40)),s:S.teams.map(t=>t.score)};
+    const live=cur&&!cur.done;
+    const st={tok:live?cur.tok:null,ph:live?cur.ph:"idle",win:live?cur.win:0,bl:live?cur.bl:[],lk:live?[1,2].filter(locked):[],n:S.teams.map(t=>t.name.slice(0,40)),s:S.teams.map(t=>t.score)};
     client.publish(T()+"/state",JSON.stringify(st),{qos:1,retain:true});
+  }
+  function onBuzz(team,tk,ph){
+    if(!cur||cur.done||tk!==cur.tok||cur.bl.includes(team))return;
+    if(cur.ph==="read"||ph==="read"){
+      if(!cur.fs[team]){cur.fs[team]=1;beep(140,.25);
+        if(cur.ph!=="read")setLock(team);
+        drawQ();pub()}
+      return;
+    }
+    if(cur.ph==="open"&&!cur.win&&!locked(team))setWin(team);
+  }
+  function setLock(t){
+    cur.lock[t]=S.fsPen<0?Infinity:Date.now()+S.fsPen*1000;
+    if(S.fsPen>=0){clearTimeout(lockTimer);lockTimer=setTimeout(()=>{drawQ();pub()},S.fsPen*1000+50)}
   }
   function startLink(){
     if(client){try{client.end(true)}catch(e){}}
@@ -326,8 +374,9 @@ async function host(){
     if(!client)return;
     client.on("message",(tp,b)=>{
       const d=parse(b);if(!d||(d.team!==1&&d.team!==2))return;
-      if(tp===T()+"/hello"){const was=online(d.team);seenAt[d.team]=Date.now();if(!was){dots();pub()}}
-      else if(tp===T()+"/buzz"){seenAt[d.team]=Date.now();if(cur&&cur.open&&!cur.win&&!cur.done&&d.tok===cur.tok&&!cur.bl.includes(d.team))setWin(d.team)}
+      const was=online(d.team);seenAt[d.team]=Date.now();
+      if(!was){dots();pub()}
+      if(tp===T()+"/buzz")onBuzz(d.team,d.tok,d.ph);
     });
   }
   function dots(){
@@ -340,7 +389,7 @@ async function host(){
 
   function renderTeams(){
     $("teams").innerHTML=S.teams.map((t,k)=>'<div class="team'+(k===S.chooser?" turn":"")+'" style="--tc:var(--t'+(k+1)+')">'+(k===S.chooser?'<span class="badge">Выбирает вопрос</span>':'')+
-      '<input id="tn'+k+'" data-t="'+k+'" value="'+esc(t.name)+'" maxlength="30" aria-label="Название команды '+(k+1)+'"><div class="sc">'+t.score+'</div>'+
+      '<input id="tn'+k+'" data-t="'+k+'" value="'+esc(t.name)+'" maxlength="30" aria-label="Название команды '+(k+1)+'"><div class="sc'+(t.score<0?" neg":"")+'">'+t.score+'</div>'+
       '<small data-st="'+(k+1)+'"></small></div>').join("");
     dots();
   }
@@ -367,54 +416,70 @@ async function host(){
   }
 
   function drawTimer(){
-    const t=S.timer,show=t&&cur&&!cur.done;
+    let show=false,frac=0,txt="",low=false;
+    if(cur&&!cur.done){
+      if(cur.ph==="read")txt="Дочитайте вопрос и нажмите «Открыть кнопки» (Enter). Нажатие раньше — фальстарт.";
+      else if(cur.ph==="ans"&&S.atime){show=true;frac=aLeft/S.atime;low=aLeft<=3;txt=aLeft>0?"На ответ: "+aLeft+" с":"Время на ответ вышло!"}
+      else if(cur.ph==="ans")txt="Команда отвечает";
+      else if(S.timer){show=true;frac=left/S.timer;low=left<=5;txt=left>0?"Осталось "+left+" с":"Время вышло"}
+    }
     $("timer").style.visibility=show?"":"hidden";
-    $("timerLbl").textContent=!show?"":cur.win?"Таймер на паузе — команда отвечает":left>0?"Осталось "+left+" с":"Время вышло";
-    $("timerBar").style.width=t?(Math.max(0,left)/t*100)+"%":"0";
-    $("timer").classList.toggle("low",!!t&&left<=5);
+    $("timerBar").style.width=(Math.max(0,frac)*100)+"%";
+    $("timer").classList.toggle("low",low);
+    $("timerLbl").textContent=txt;
   }
   function startTick(){
     clearInterval(tick);
-    if(!S.timer)return;
     tick=setInterval(()=>{
-      if(!cur||cur.done||cur.win||!cur.open)return;
-      left--;
-      if(left<=0){cur.open=false;beep(220,.6);drawQ();pub()}
+      if(!cur||cur.done)return;
+      if(cur.ph==="open"&&S.timer){left--;if(left<=0){cur.ph="shut";beep(220,.6);drawQ();pub()}}
+      else if(cur.ph==="ans"&&S.atime&&aLeft>0){aLeft--;if(aLeft===0){beep(200,.8);drawQ()}}
       drawTimer();
     },1000);
   }
   function openQ(g,i){
     const b=S.board[g],q=DB.cats[b[0]].q[b[1][i]];
-    cur={g,i,r:S.round,val:BASE[i]*(S.round+1),tok:tok(),open:true,win:0,bl:[],done:0,ok:0,rev:false,cat:DB.cats[b[0]].name,q:q[1],a:q[2]};
-    left=S.timer;
+    cur={g,i,r:S.round,val:BASE[i]*(S.round+1),tok:tok(),ph:"read",win:0,bl:[],fs:{},lock:{},done:0,ok:0,rev:false,cat:DB.cats[b[0]].name,q:q[1],a:q[2],img:q[3]||""};
+    left=S.timer;aLeft=S.atime;
     $("qCat").textContent=cur.cat;$("qVal").textContent=cur.val;
     $("qText").textContent=cur.q;$("ansText").textContent=cur.a;
+    const im=$("qImg");if(cur.img){im.src=cur.img;im.hidden=false}else{im.removeAttribute("src");im.hidden=true}
     $("qOv").classList.add("on");
     drawQ();startTick();pub();
+  }
+  function openButtons(){
+    if(!cur||cur.done||cur.ph!=="read")return;
+    cur.ph="open";
+    Object.keys(cur.fs).forEach(t=>setLock(+t));
+    beep(520,.15);drawQ();pub();
   }
   function drawQ(){
     if(!cur)return;
     const bz=$("buzz");let txt,cls="";
+    const fsT=[1,2].filter(t=>cur.fs[t]);
+    const fsNote=fsT.length?" Фальстарт: "+fsT.map(t=>"«"+tName(t)+"»"+(cur.ph!=="read"&&locked(t)?(S.fsPen<0?" (без права ответа)":" (блок "+S.fsPen+" с)"):"")).join(", ")+".":"";
     if(cur.done&&cur.ok){txt="Верно! +"+cur.val+" — «"+tName(cur.ok)+"»";cls="okk"}
     else if(cur.done)txt="Никто не ответил";
-    else if(cur.win){txt="Отвечает: «"+tName(cur.win)+"»";cls="w"+cur.win}
-    else if(!cur.open)txt="Время вышло";
-    else if(cur.bl.length){txt="«"+tName(cur.bl[0])+"» ошиблась — отвечает соперник, жмите!";cls="open"}
-    else{txt="Кнопки открыты — жмите, если знаете!";cls="open"}
+    else if(cur.ph==="ans"){txt="Отвечает: «"+tName(cur.win)+"»";cls="w"+cur.win}
+    else if(cur.ph==="read"){txt="Слушаем вопрос — кнопки закрыты."+fsNote;cls=fsT.length?"fs":""}
+    else if(cur.ph==="shut")txt="Время вышло";
+    else if(cur.bl.length){txt="«"+tName(cur.bl[0])+"» ошиблась (−"+cur.val+") — отвечает соперник, жмите!"+fsNote;cls="open"}
+    else{txt="Кнопки открыты — жмите!"+fsNote;cls="open"}
     bz.textContent=txt;bz.className="buzz "+cls;
     $("ans").classList.toggle("on",cur.rev);
     let a="";
-    if(!cur.done&&cur.win)a+='<button class="btn ok" type="button" data-act="ok">Верно +'+cur.val+'</button><button class="btn no" type="button" data-act="no">Неверно</button>';
+    if(!cur.done&&cur.ph==="read")a+='<button class="btn gold big" type="button" data-act="open">Открыть кнопки</button>';
+    if(!cur.done&&cur.ph==="ans")a+='<button class="btn ok" type="button" data-act="ok">Верно +'+cur.val+'</button><button class="btn no" type="button" data-act="no">Неверно −'+cur.val+'</button>';
     else if(!cur.done)[1,2].forEach(t=>{if(!cur.bl.includes(t))a+='<button class="btn c'+t+'" type="button" data-act="w'+t+'">Отвечает «'+esc(tName(t))+'»</button>'});
     a+='<span class="sp"></span>';
-    if(!cur.rev)a+='<button class="btn gold" type="button" data-act="rev">Показать ответ</button>';
+    if(!cur.rev)a+='<button class="btn" type="button" data-act="rev">Показать ответ</button>';
     a+=cur.done?'<button class="btn gold" type="button" data-act="close">К табло</button>':'<button class="btn" type="button" data-act="back">Вернуть на табло</button><button class="btn" type="button" data-act="none">Никто не ответил</button>';
     $("acts").innerHTML=a;
     drawTimer();
   }
   function setWin(t){
     if(!cur||cur.done||cur.win||cur.bl.includes(t))return;
-    cur.win=t;cur.open=false;beep(t===1?660:880,.35);drawQ();pub();
+    cur.win=t;cur.ph="ans";aLeft=S.atime;beep(t===1?660:880,.35);drawQ();pub();
   }
   function markNone(){
     if(!cur.done){const key=cur.g+"-"+cur.i;S.used[key]=1;S.log.push({t:0,d:0,key,ch:S.chooser,r:cur.r})}
@@ -428,16 +493,19 @@ async function host(){
       S.log.push({t,d:cur.val,key,ch:S.chooser,r:cur.r});
       S.used[key]=1;S.chooser=t-1;cur.done=1;cur.ok=t;cur.rev=true;beep(1046,.25);
     }else{
+      S.teams[t-1].score-=cur.val;
+      S.log.push({t,d:-cur.val,key:null,ch:S.chooser,r:cur.r});
       cur.bl.push(t);cur.win=0;beep(160,.4);
-      if(cur.bl.length>=2)markNone();else{cur.tok=tok();cur.open=left>0||!S.timer}
+      if(cur.bl.length>=2)markNone();else{cur.tok=tok();cur.ph=(left>0||!S.timer)?"open":"shut"}
     }
     drawQ();render();
   }
-  function closeQ(){clearInterval(tick);cur=null;$("qOv").classList.remove("on");render()}
+  function closeQ(){clearInterval(tick);clearTimeout(lockTimer);cur=null;$("qOv").classList.remove("on");render()}
   function undo(){
     const e=S.log.pop();if(!e)return;
     if(e.t)S.teams[e.t-1].score-=e.d;
-    delete S.used[e.key];S.chooser=e.ch;S.round=e.r;render();
+    if(e.key)delete S.used[e.key];
+    S.chooser=e.ch;S.round=e.r;render();
   }
 
   function openLinks(){
@@ -457,7 +525,8 @@ async function host(){
     const t=e.target.closest("button,input[type=checkbox]");if(!t)return;
     if(t.matches(".cell:not(.used)"))return openQ(+t.dataset.g,+t.dataset.i);
     if(t.dataset.act){const a=t.dataset.act;
-      if(a==="ok")judge(true);else if(a==="no")judge(false);
+      if(a==="open")openButtons();
+      else if(a==="ok")judge(true);else if(a==="no")judge(false);
       else if(a==="w1")setWin(1);else if(a==="w2")setWin(2);
       else if(a==="rev"){cur.rev=true;drawQ()}
       else if(a==="none"){markNone();drawQ();render()}
@@ -473,20 +542,23 @@ async function host(){
       case "linkBtn":openLinks();break;
       case "lClose":$("lOv").classList.remove("on");break;
       case "newCode":S.room=rnd(4);save();seenAt[1]=seenAt[2]=0;startLink();openLinks();break;
-      case "setBtn":draft=S.sel.slice();$("timerSel").value=String(S.timer);drawCats();$("sOv").classList.add("on");break;
+      case "setBtn":draft=S.sel.filter(c=>DB.cats[c]);$("timerSel").value=String(S.timer);$("atimeSel").value=String(S.atime);$("fsSel").value=String(S.fsPen);drawCats();$("sOv").classList.add("on");break;
       case "sClose":$("sOv").classList.remove("on");break;
       case "allBtn":draft=DB.cats.map((_,i)=>i);drawCats();break;
       case "shufBtn":for(let i=draft.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[draft[i],draft[j]]=[draft[j],draft[i]]}drawCats();break;
       case "resetSeen":S.seen={};save();drawCats();break;
-      case "sApply":{const tm=+$("timerSel").value;S=fresh(S);S.sel=draft.slice();S.timer=tm;deal();$("sOv").classList.remove("on");render();break}
+      case "sApply":{S=fresh(S);S.sel=draft.slice();S.timer=+$("timerSel").value;S.atime=+$("atimeSel").value;S.fsPen=+$("fsSel").value;deal();$("sOv").classList.remove("on");render();break}
     }
   });
   document.addEventListener("input",e=>{const k=e.target.dataset.t;if(k!==undefined){S.teams[+k].name=e.target.value;save();pub()}});
   $("timerSel").addEventListener("change",e=>{S.timer=+e.target.value;save()});
+  $("atimeSel").addEventListener("change",e=>{S.atime=+e.target.value;save()});
+  $("fsSel").addEventListener("change",e=>{S.fsPen=+e.target.value;save()});
   document.addEventListener("keydown",e=>{
     if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
     if(cur){
-      if(e.key==="1")setWin(1);else if(e.key==="2")setWin(2);
+      if(e.key==="Enter"){e.preventDefault();openButtons()}
+      else if(e.key==="1")setWin(1);else if(e.key==="2")setWin(2);
       else if(e.key===" "){e.preventDefault();cur.rev=true;drawQ()}
       else if(e.key==="Escape")closeQ();
     }else if(e.key==="Escape"){$("sOv").classList.remove("on");$("lOv").classList.remove("on")}
@@ -494,8 +566,9 @@ async function host(){
   setInterval(()=>{dots();pub()},5000);
 
   startLink();
-  try{const res=await fetch("questions.json");DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
-  if(S.board&&S.board.some(b=>!DB.cats[b[0]]))S=fresh(S);
+  try{const res=await fetch("questions.json?v=5",{cache:"no-cache"});DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
+  if(S.sel.some(c=>!DB.cats[c])||(S.board&&S.board.some(b=>!DB.cats[b[0]]))){S.sel=DB.cats.map((_,i)=>i).slice(0,10);S.board=null}
+  if(S.dv!==5){S.dv=5;S.seen={};S=Object.assign(fresh(S),{dv:5});S.seen={}}
   render();
 }
 

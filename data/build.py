@@ -7,8 +7,10 @@ for f in ['data/1.txt','data/2.txt','data/3.txt']:
         if ln.startswith('## '):
             i,n=ln[3:].split('|');cur={'id':i,'name':n,'q':[]};cats.append(cur);continue
         p=ln.split('|')
-        assert len(p)==3,ln
-        cur['q'].append([int(p[0]),p[1].strip(),p[2].strip()])
+        assert len(p) in (3,4),ln
+        q=[int(p[0]),p[1].strip(),p[2].strip()]
+        if len(p)==4: q.append(p[3].strip())
+        cur['q'].append(q)
 tot=0
 for c in cats:
     cnt=collections.Counter(q[0] for q in c['q'])
