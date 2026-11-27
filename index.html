@@ -66,10 +66,11 @@ h1 span{color:var(--gold)}
 .qt{font:500 clamp(24px,4vw,48px)/1.2 Rubik,sans-serif;margin:20px 0 22px;text-wrap:balance}
 .qimg{display:block;max-width:min(100%,640px);max-height:min(44vh,420px);margin:18px auto 0;border-radius:6px;box-shadow:0 0 0 1px rgba(255,255,255,.25),0 12px 30px rgba(0,0,0,.45)}
 .credit{text-align:center;color:var(--mute);font-size:12px;margin-top:6px;min-height:0}
-.buzz.fs{border-color:var(--bad);color:#ffb3b5}
 .btn.big{min-height:56px;padding:0 26px;font-size:18px}
 .team .sc.neg{color:var(--bad)}
-body[data-st=read] .bz{filter:grayscale(.75) brightness(.7)}
+@keyframes qfade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.fade{animation:qfade .7s ease-out both}
+.qimg.fade{animation-duration:.9s}
 .buzz{border-radius:12px;padding:14px 18px;margin-bottom:14px;font:400 clamp(20px,2.8vw,34px)/1.15 "Russo One",sans-serif;background:var(--deep);border:2px solid var(--line);color:var(--mute)}
 .buzz.open{border-color:var(--gold);color:var(--gold)}
 .buzz.w1{background:var(--t1);border-color:var(--t1);color:#fff}
@@ -126,7 +127,7 @@ body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#
 .tools .btn{flex:1;padding:0 10px}
 .teams,.links{grid-template-columns:minmax(0,1fr)}
 }
-@media(prefers-reduced-motion:reduce){.cell,.timer i,.bz{transition:none}}
+@media(prefers-reduced-motion:reduce){.cell,.timer i,.bz{transition:none}.fade{animation:none}}
 </style>
 </head>
 <body>
@@ -145,7 +146,7 @@ body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#
   </div>
   <div class="teams" id="teams"></div>
   <div id="board"></div>
-  <p class="hint">Выбирает команда с золотой меткой. Ведущий читает вопрос и открывает кнопки (<b>Enter</b>); кто нажал раньше — фальстарт и блокировка кнопки. Отвечает тот, кто первым нажал после открытия. Верно — плюс цена вопроса, неверно — минус, и право ответа у соперников. Клавиши: <b>1</b>/<b>2</b> — отдать ответ вручную, пробел — показать ответ, Esc — вернуть вопрос на табло.</p>
+  <p class="hint">Выбирает команда с золотой меткой. Кнопки на пультах открываются сразу вместе с вопросом — отвечает тот, кто нажал первым. Верно — плюс цена вопроса, неверно — минус, и право ответа у соперников. Клавиши: <b>1</b>/<b>2</b> — отдать ответ вручную, пробел — показать ответ, Esc — вернуть вопрос на табло.</p>
 </div>
 </div>
 
@@ -197,15 +198,6 @@ body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#
         <option value="10">10 секунд</option>
         <option value="15">15 секунд</option>
         <option value="20">20 секунд</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="fsSel">Штраф за фальстарт</label>
-      <select id="fsSel">
-        <option value="2">Блок кнопки на 2 секунды</option>
-        <option value="3">Блок кнопки на 3 секунды</option>
-        <option value="5">Блок кнопки на 5 секунд</option>
-        <option value="-1">Без права ответа на этот вопрос</option>
       </select>
     </div>
     <div class="acts">
@@ -275,7 +267,7 @@ function phone(team,room){
   document.body.style.setProperty("--tc",team===1?"var(--t1)":"var(--t2)");
   $("phoneView").hidden=false;
   const bz=$("bz"),st=$("pState"),T=topic(room);
-  let H=null,pressed=null,fsTok=null,up=false;
+  let H=null,pressed=null,up=false;
   try{navigator.wakeLock&&navigator.wakeLock.request("screen").catch(()=>{})}catch(e){}
   const mode=()=>{
     if(!up)return["Подключение…","wait",0];
@@ -284,8 +276,6 @@ function phone(team,room){
     if(H.win===team)return["Вы отвечаете!","win",0];
     if(H.win)return["Отвечает соперник","lose",0];
     if((H.bl||[]).includes(team))return["Ваша команда ответила неверно","lose",0];
-    if((H.lk||[]).includes(team))return["Фальстарт! Кнопка заблокирована","lose",0];
-    if(H.ph==="read")return fsTok===H.tok?["Фальстарт! Вы нажали раньше времени","lose",0]:["Слушайте вопрос — пока не жмите!","read",1];
     if(H.ph==="open")return pressed===H.tok?["Нажато! Ждём…","sent",0]:["Жмите, если знаете ответ!","go",1];
     return["Время вышло","wait",0];
   };
@@ -294,7 +284,7 @@ function phone(team,room){
     $("pScore").textContent=H&&H.s?("Счёт "+H.s[team-1]+" : "+H.s[2-team]):"";
     const[s,cls,can]=mode();
     st.textContent=s;document.body.dataset.st=cls;bz.disabled=!can;
-    bz.textContent=cls==="win"?"ВЫ!":cls==="read"?"ЖДИ":"ЖМИ";
+    bz.textContent=cls==="win"?"ВЫ!":"ЖМИ";
   };
   const c=connect(()=>{
     up=true;$("pConn").textContent="Пульт на связи · код "+room;
@@ -307,10 +297,9 @@ function phone(team,room){
   bz.addEventListener("pointerdown",e=>{
     e.preventDefault();
     if(bz.disabled||!up||!H||!H.tok)return;
-    const ph=H.ph;
-    if(ph==="read")fsTok=H.tok;else pressed=H.tok;
-    c.publish(T+"/buzz",JSON.stringify({team,tok:H.tok,ph}),{qos:1});
-    try{navigator.vibrate&&navigator.vibrate(ph==="read"?[60,60,60]:80)}catch(err){}
+    pressed=H.tok;
+    c.publish(T+"/buzz",JSON.stringify({team,tok:H.tok}),{qos:1});
+    try{navigator.vibrate&&navigator.vibrate(80)}catch(err){}
     draw();
   });
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){hello();draw()}});
@@ -320,15 +309,14 @@ function phone(team,room){
 /* ---------- host / presentation ---------- */
 async function host(){
   $("hostView").hidden=false;
-  let DB=null,cur=null,tick=null,left=0,aLeft=0,actx=null,client=null,up=false,lockTimer=null;
+  let DB=null,cur=null,tick=null,left=0,aLeft=0,actx=null,client=null,up=false;
   const seenAt={1:0,2:0};
-  const fresh=o=>({room:o&&o.room||rnd(4),teams:o?o.teams.map(t=>({name:t.name,score:0})):[{name:"Команда 1",score:0},{name:"Команда 2",score:0}],sel:o?o.sel:[0,1,2,3,4,5,6,7,8,9,10],timer:o?o.timer:30,atime:o&&o.atime!=null?o.atime:10,fsPen:o&&o.fsPen!=null?o.fsPen:3,round:0,board:null,used:{},chooser:0,log:[],seen:o?o.seen:{}});
+  const fresh=o=>({room:o&&o.room||rnd(4),teams:o?o.teams.map(t=>({name:t.name,score:0})):[{name:"Команда 1",score:0},{name:"Команда 2",score:0}],sel:o?o.sel:[0,1,2,3,4,5,6,7,8,9,10],timer:o?o.timer:30,atime:o&&o.atime!=null?o.atime:10,round:0,board:null,used:{},chooser:0,log:[],seen:o?o.seen:{}});
   let S=null;
   try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
   if(!S||!S.teams||!S.sel)S=fresh();
   if(!S.room)S.room=rnd(4);
   if(S.atime==null)S.atime=10;
-  if(S.fsPen==null)S.fsPen=3;
   const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
   const T=()=>topic(S.room);
   const nR=()=>Math.max(1,Math.ceil(S.board.length/PER));
@@ -339,7 +327,6 @@ async function host(){
   const tName=t=>S.teams[t-1].name||("Команда "+t);
   const link=t=>SITE+"?room="+S.room+"&team="+t;
   const online=t=>Date.now()-seenAt[t]<70000;
-  const locked=t=>!!(cur&&cur.lock[t]&&Date.now()<cur.lock[t]);
 
   function pick(c,l){
     const all=DB.cats[c].q.map((q,i)=>q[0]===l?i:-1).filter(i=>i>=0);
@@ -355,22 +342,12 @@ async function host(){
   function pub(){
     if(!client||!up)return;
     const live=cur&&!cur.done;
-    const st={tok:live?cur.tok:null,ph:live?cur.ph:"idle",win:live?cur.win:0,bl:live?cur.bl:[],lk:live?[1,2].filter(locked):[],n:S.teams.map(t=>t.name.slice(0,40)),s:S.teams.map(t=>t.score)};
+    const st={tok:live?cur.tok:null,ph:live?cur.ph:"idle",win:live?cur.win:0,bl:live?cur.bl:[],n:S.teams.map(t=>t.name.slice(0,40)),s:S.teams.map(t=>t.score)};
     client.publish(T()+"/state",JSON.stringify(st),{qos:1,retain:true});
   }
-  function onBuzz(team,tk,ph){
+  function onBuzz(team,tk){
     if(!cur||cur.done||tk!==cur.tok||cur.bl.includes(team))return;
-    if(cur.ph==="read"||ph==="read"){
-      if(!cur.fs[team]){cur.fs[team]=1;beep(140,.25);
-        if(cur.ph!=="read")setLock(team);
-        drawQ();pub()}
-      return;
-    }
-    if(cur.ph==="open"&&!cur.win&&!locked(team))setWin(team);
-  }
-  function setLock(t){
-    cur.lock[t]=S.fsPen<0?Infinity:Date.now()+S.fsPen*1000;
-    if(S.fsPen>=0){clearTimeout(lockTimer);lockTimer=setTimeout(()=>{drawQ();pub()},S.fsPen*1000+50)}
+    if(cur.ph==="open"&&!cur.win)setWin(team);
   }
   function startLink(){
     if(client){try{client.end(true)}catch(e){}}
@@ -381,7 +358,7 @@ async function host(){
       const d=parse(b);if(!d||(d.team!==1&&d.team!==2))return;
       const was=online(d.team);seenAt[d.team]=Date.now();
       if(!was){dots();pub()}
-      if(tp===T()+"/buzz")onBuzz(d.team,d.tok,d.ph);
+      if(tp===T()+"/buzz")onBuzz(d.team,d.tok);
     });
   }
   function dots(){
@@ -423,8 +400,7 @@ async function host(){
   function drawTimer(){
     let show=false,frac=0,txt="",low=false;
     if(cur&&!cur.done){
-      if(cur.ph==="read")txt="Дочитайте вопрос и нажмите «Открыть кнопки» (Enter). Нажатие раньше — фальстарт.";
-      else if(cur.ph==="ans"&&S.atime){show=true;frac=aLeft/S.atime;low=aLeft<=3;txt=aLeft>0?"На ответ: "+aLeft+" с":"Время на ответ вышло!"}
+      if(cur.ph==="ans"&&S.atime){show=true;frac=aLeft/S.atime;low=aLeft<=3;txt=aLeft>0?"На ответ: "+aLeft+" с":"Время на ответ вышло!"}
       else if(cur.ph==="ans")txt="Команда отвечает";
       else if(S.timer){show=true;frac=left/S.timer;low=left<=5;txt=left>0?"Осталось "+left+" с":"Время вышло"}
     }
@@ -444,36 +420,27 @@ async function host(){
   }
   function openQ(g,i){
     const b=S.board[g],q=DB.cats[b[0]].q[b[1][i]];
-    cur={g,i,r:S.round,val:BASE[i]*(S.round+1),tok:tok(),ph:"read",win:0,bl:[],fs:{},lock:{},done:0,ok:0,rev:false,cat:DB.cats[b[0]].name,q:q[1],a:q[2],img:q[3]||""};
+    cur={g,i,r:S.round,val:BASE[i]*(S.round+1),tok:tok(),ph:"open",win:0,bl:[],done:0,ok:0,rev:false,cat:DB.cats[b[0]].name,q:q[1],a:q[2],img:q[3]||""};
     left=S.timer;aLeft=S.atime;
     $("qCat").textContent=cur.cat;$("qVal").textContent=cur.val;
     $("qText").textContent=cur.q;$("ansText").textContent=cur.a;
     const im=$("qImg"),cr=$("qCredit");if(cur.img){im.hidden=false;cr.textContent=/wikimedia/.test(cur.img)?"Фото: Wikimedia Commons":"";im.src=cur.img}else{im.removeAttribute("src");im.hidden=true;cr.textContent=""}
     $("qOv").classList.add("on");
+    ["qText","qImg"].forEach(id=>{const el=$(id);el.classList.remove("fade");void el.offsetWidth;el.classList.add("fade")});
     drawQ();startTick();pub();
-  }
-  function openButtons(){
-    if(!cur||cur.done||cur.ph!=="read")return;
-    cur.ph="open";
-    Object.keys(cur.fs).forEach(t=>setLock(+t));
-    beep(520,.15);drawQ();pub();
   }
   function drawQ(){
     if(!cur)return;
     const bz=$("buzz");let txt,cls="";
-    const fsT=[1,2].filter(t=>cur.fs[t]);
-    const fsNote=fsT.length?" Фальстарт: "+fsT.map(t=>"«"+tName(t)+"»"+(cur.ph!=="read"&&locked(t)?(S.fsPen<0?" (без права ответа)":" (блок "+S.fsPen+" с)"):"")).join(", ")+".":"";
     if(cur.done&&cur.ok){txt="Верно! +"+cur.val+" — «"+tName(cur.ok)+"»";cls="okk"}
     else if(cur.done)txt="Никто не ответил";
     else if(cur.ph==="ans"){txt="Отвечает: «"+tName(cur.win)+"»";cls="w"+cur.win}
-    else if(cur.ph==="read"){txt="Слушаем вопрос — кнопки закрыты."+fsNote;cls=fsT.length?"fs":""}
     else if(cur.ph==="shut")txt="Время вышло";
-    else if(cur.bl.length){txt="«"+tName(cur.bl[0])+"» ошиблась (−"+cur.val+") — отвечает соперник, жмите!"+fsNote;cls="open"}
-    else{txt="Кнопки открыты — жмите!"+fsNote;cls="open"}
+    else if(cur.bl.length){txt="«"+tName(cur.bl[0])+"» ошиблась (−"+cur.val+") — отвечает соперник, жмите!";cls="open"}
+    else{txt="Кнопки открыты — жмите!";cls="open"}
     bz.textContent=txt;bz.className="buzz "+cls;
     $("ans").classList.toggle("on",cur.rev);
     let a="";
-    if(!cur.done&&cur.ph==="read")a+='<button class="btn gold big" type="button" data-act="open">Открыть кнопки</button>';
     if(!cur.done&&cur.ph==="ans")a+='<button class="btn ok" type="button" data-act="ok">Верно +'+cur.val+'</button><button class="btn no" type="button" data-act="no">Неверно −'+cur.val+'</button>';
     else if(!cur.done)[1,2].forEach(t=>{if(!cur.bl.includes(t))a+='<button class="btn c'+t+'" type="button" data-act="w'+t+'">Отвечает «'+esc(tName(t))+'»</button>'});
     a+='<span class="sp"></span>';
@@ -505,7 +472,7 @@ async function host(){
     }
     drawQ();render();
   }
-  function closeQ(){clearInterval(tick);clearTimeout(lockTimer);cur=null;$("qOv").classList.remove("on");render()}
+  function closeQ(){clearInterval(tick);cur=null;$("qOv").classList.remove("on");render()}
   function undo(){
     const e=S.log.pop();if(!e)return;
     if(e.t)S.teams[e.t-1].score-=e.d;
@@ -530,8 +497,7 @@ async function host(){
     const t=e.target.closest("button,input[type=checkbox]");if(!t)return;
     if(t.matches(".cell:not(.used)"))return openQ(+t.dataset.g,+t.dataset.i);
     if(t.dataset.act){const a=t.dataset.act;
-      if(a==="open")openButtons();
-      else if(a==="ok")judge(true);else if(a==="no")judge(false);
+      if(a==="ok")judge(true);else if(a==="no")judge(false);
       else if(a==="w1")setWin(1);else if(a==="w2")setWin(2);
       else if(a==="rev"){cur.rev=true;drawQ()}
       else if(a==="none"){markNone();drawQ();render()}
@@ -547,23 +513,21 @@ async function host(){
       case "linkBtn":openLinks();break;
       case "lClose":$("lOv").classList.remove("on");break;
       case "newCode":S.room=rnd(4);save();seenAt[1]=seenAt[2]=0;startLink();openLinks();break;
-      case "setBtn":draft=S.sel.filter(c=>DB.cats[c]);$("timerSel").value=String(S.timer);$("atimeSel").value=String(S.atime);$("fsSel").value=String(S.fsPen);drawCats();$("sOv").classList.add("on");break;
+      case "setBtn":draft=S.sel.filter(c=>DB.cats[c]);$("timerSel").value=String(S.timer);$("atimeSel").value=String(S.atime);drawCats();$("sOv").classList.add("on");break;
       case "sClose":$("sOv").classList.remove("on");break;
       case "allBtn":draft=DB.cats.map((_,i)=>i);drawCats();break;
       case "shufBtn":for(let i=draft.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[draft[i],draft[j]]=[draft[j],draft[i]]}drawCats();break;
       case "resetSeen":S.seen={};save();drawCats();break;
-      case "sApply":{S=fresh(S);S.sel=draft.slice();S.timer=+$("timerSel").value;S.atime=+$("atimeSel").value;S.fsPen=+$("fsSel").value;deal();$("sOv").classList.remove("on");render();break}
+      case "sApply":{S=fresh(S);S.sel=draft.slice();S.timer=+$("timerSel").value;S.atime=+$("atimeSel").value;deal();$("sOv").classList.remove("on");render();break}
     }
   });
   document.addEventListener("input",e=>{const k=e.target.dataset.t;if(k!==undefined){S.teams[+k].name=e.target.value;save();pub()}});
   $("timerSel").addEventListener("change",e=>{S.timer=+e.target.value;save()});
   $("atimeSel").addEventListener("change",e=>{S.atime=+e.target.value;save()});
-  $("fsSel").addEventListener("change",e=>{S.fsPen=+e.target.value;save()});
   document.addEventListener("keydown",e=>{
     if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
     if(cur){
-      if(e.key==="Enter"){e.preventDefault();openButtons()}
-      else if(e.key==="1")setWin(1);else if(e.key==="2")setWin(2);
+      if(e.key==="1")setWin(1);else if(e.key==="2")setWin(2);
       else if(e.key===" "){e.preventDefault();cur.rev=true;drawQ()}
       else if(e.key==="Escape")closeQ();
     }else if(e.key==="Escape"){$("sOv").classList.remove("on");$("lOv").classList.remove("on")}
@@ -572,9 +536,10 @@ async function host(){
   $("qImg").addEventListener("error",()=>{$("qCredit").textContent="Фото не загрузилось — проверьте интернет. Ответ ведущий может прочитать в «Показать ответ»."});
 
   startLink();
-  try{const res=await fetch("questions.json?v=6",{cache:"no-cache"});DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
+  try{const res=await fetch("questions.json?v=7",{cache:"no-cache"});DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
   if(S.sel.some(c=>!DB.cats[c])||(S.board&&S.board.some(b=>!DB.cats[b[0]]))){S.sel=DB.cats.map((_,i)=>i).slice(0,10);S.board=null}
-  if(S.dv!==6){S=Object.assign(fresh(S),{dv:6});S.seen={};S.sel=DB.cats.map((_,i)=>i)}
+  if(S.dv!==6&&S.dv!==7){S=Object.assign(fresh(S),{dv:7});S.seen={};S.sel=DB.cats.map((_,i)=>i)}
+  else if(S.dv===6){const ai=DB.cats.findIndex(c=>c.id==="anime");Object.keys(S.seen).forEach(k=>{if(k.startsWith(ai+"-"))delete S.seen[k]});S=Object.assign(fresh(S),{dv:7})}
   render();
 }
 
