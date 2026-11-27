@@ -348,6 +348,8 @@ async function host(){
     const i=free[Math.floor(Math.random()*free.length)];S.seen[c+"-"+i]=1;return i;
   }
   function deal(){S.board=S.sel.filter(c=>DB.cats[c]).map(c=>[c,[1,2,3,4,5].map(l=>pick(c,l))]);save()}
+  const pre=new Map();
+  function preload(){if(!S.board)return;S.board.forEach(b=>b[1].forEach(i=>{const u=DB.cats[b[0]].q[i][3];if(u&&!pre.has(u)){const im=new Image();im.decoding="async";im.src=u;pre.set(u,im)}}))}
   function beep(f,d){try{actx=actx||new AudioContext();const o=actx.createOscillator(),g=actx.createGain();o.type="square";o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.12,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.start();o.stop(actx.currentTime+d)}catch(e){}}
 
   function pub(){
@@ -415,7 +417,7 @@ async function host(){
       h='<div class="board done"><h2>'+(a===b?"Ничья!":"Победила команда «"+esc(a>b?tName(1):tName(2))+"»")+'</h2><p>Итоговый счёт '+a+' : '+b+'</p><button class="btn gold" type="button" id="againBtn">Новая игра</button></div>';
     }
     $("board").innerHTML=h;
-    save();pub();
+    preload();save();pub();
   }
 
   function drawTimer(){
