@@ -420,7 +420,7 @@ async function host(){
   }
   function openQ(g,i){
     const b=S.board[g],q=DB.cats[b[0]].q[b[1][i]];
-    cur={g,i,r:S.round,val:BASE[i]*(S.round+1),tok:tok(),ph:"open",win:0,bl:[],done:0,ok:0,rev:false,cat:DB.cats[b[0]].name,q:q[1],a:q[2],img:q[3]||""};
+    cur={g,i,r:S.round,val:BASE[i]*(S.round+1),tok:tok(),ph:"open",win:0,bl:[],done:0,ok:0,rev:false,cat:DB.cats[b[0]].name+(q[4]?" · "+q[4]:""),q:q[1],a:q[2],img:q[3]||""};
     left=S.timer;aLeft=S.atime;
     $("qCat").textContent=cur.cat;$("qVal").textContent=cur.val;
     $("qText").textContent=cur.q;$("ansText").textContent=cur.a;
@@ -536,10 +536,10 @@ async function host(){
   $("qImg").addEventListener("error",()=>{$("qCredit").textContent="Фото не загрузилось — проверьте интернет. Ответ ведущий может прочитать в «Показать ответ»."});
 
   startLink();
-  try{const res=await fetch("questions.json?v=7",{cache:"no-cache"});DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
+  try{const res=await fetch("questions.json?v=8",{cache:"no-cache"});DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
   if(S.sel.some(c=>!DB.cats[c])||(S.board&&S.board.some(b=>!DB.cats[b[0]]))){S.sel=DB.cats.map((_,i)=>i).slice(0,10);S.board=null}
-  if(S.dv!==6&&S.dv!==7){S=Object.assign(fresh(S),{dv:7});S.seen={};S.sel=DB.cats.map((_,i)=>i)}
-  else if(S.dv===6){const ai=DB.cats.findIndex(c=>c.id==="anime");Object.keys(S.seen).forEach(k=>{if(k.startsWith(ai+"-"))delete S.seen[k]});S=Object.assign(fresh(S),{dv:7})}
+  if(S.dv!==6&&S.dv!==7&&S.dv!==8){S=Object.assign(fresh(S),{dv:8});S.seen={};S.sel=DB.cats.map((_,i)=>i)}
+  else if(S.dv===6||S.dv===7){const ai=DB.cats.findIndex(c=>c.id==="anime");Object.keys(S.seen).forEach(k=>{if(k.startsWith(ai+"-"))delete S.seen[k]});S=Object.assign(fresh(S),{dv:8})}
   render();
 }
 
