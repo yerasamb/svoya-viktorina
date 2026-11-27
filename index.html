@@ -64,7 +64,8 @@ h1 span{color:var(--gold)}
 .qh b{font-size:clamp(16px,1.8vw,22px)}
 .qh span{font:400 clamp(24px,3vw,36px) "Russo One",sans-serif;color:var(--gold);white-space:nowrap}
 .qt{font:500 clamp(24px,4vw,48px)/1.2 Rubik,sans-serif;margin:20px 0 22px;text-wrap:balance}
-.qimg{display:block;max-width:min(100%,520px);max-height:min(40vh,380px);margin:18px auto 0;border-radius:6px;box-shadow:0 0 0 1px rgba(255,255,255,.25),0 12px 30px rgba(0,0,0,.45)}
+.qimg{display:block;max-width:min(100%,640px);max-height:min(44vh,420px);margin:18px auto 0;border-radius:6px;box-shadow:0 0 0 1px rgba(255,255,255,.25),0 12px 30px rgba(0,0,0,.45)}
+.credit{text-align:center;color:var(--mute);font-size:12px;margin-top:6px;min-height:0}
 .buzz.fs{border-color:var(--bad);color:#ffb3b5}
 .btn.big{min-height:56px;padding:0 26px;font-size:18px}
 .team .sc.neg{color:var(--bad)}
@@ -152,6 +153,7 @@ body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#
   <div class="card">
     <div class="qh"><b id="qCat"></b><span id="qVal"></span></div>
     <img class="qimg" id="qImg" alt="Картинка к вопросу" hidden>
+    <div class="credit" id="qCredit"></div>
     <div class="qt" id="qText"></div>
     <div class="buzz" id="buzz" aria-live="assertive"></div>
     <div class="timer" id="timer"><i id="timerBar"></i></div>
@@ -320,7 +322,7 @@ async function host(){
   $("hostView").hidden=false;
   let DB=null,cur=null,tick=null,left=0,aLeft=0,actx=null,client=null,up=false,lockTimer=null;
   const seenAt={1:0,2:0};
-  const fresh=o=>({room:o&&o.room||rnd(4),teams:o?o.teams.map(t=>({name:t.name,score:0})):[{name:"Команда 1",score:0},{name:"Команда 2",score:0}],sel:o?o.sel:[0,1,2,3,4,5,6,7,8,9],timer:o?o.timer:30,atime:o&&o.atime!=null?o.atime:10,fsPen:o&&o.fsPen!=null?o.fsPen:3,round:0,board:null,used:{},chooser:0,log:[],seen:o?o.seen:{}});
+  const fresh=o=>({room:o&&o.room||rnd(4),teams:o?o.teams.map(t=>({name:t.name,score:0})):[{name:"Команда 1",score:0},{name:"Команда 2",score:0}],sel:o?o.sel:[0,1,2,3,4,5,6,7,8,9,10],timer:o?o.timer:30,atime:o&&o.atime!=null?o.atime:10,fsPen:o&&o.fsPen!=null?o.fsPen:3,round:0,board:null,used:{},chooser:0,log:[],seen:o?o.seen:{}});
   let S=null;
   try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
   if(!S||!S.teams||!S.sel)S=fresh();
@@ -330,7 +332,8 @@ async function host(){
   const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
   const T=()=>topic(S.room);
   const nR=()=>Math.max(1,Math.ceil(S.board.length/PER));
-  const rowsOf=r=>S.board.slice(r*PER,r*PER+PER).map((b,j)=>({g:r*PER+j,c:b[0],q:b[1]}));
+  const span=(r,n,R)=>[Math.floor(r*n/R),Math.floor((r+1)*n/R)];
+  const rowsOf=r=>{const[a,b]=span(r,S.board.length,nR());return S.board.slice(a,b).map((x,j)=>({g:a+j,c:x[0],q:x[1]}))};
   const left5=r=>rowsOf(r).reduce((n,x)=>n+BASE.filter((_,i)=>!S.used[x.g+"-"+i]).length,0);
   const tok=()=>rnd(8);
   const tName=t=>S.teams[t-1].name||("Команда "+t);
@@ -443,7 +446,7 @@ async function host(){
     left=S.timer;aLeft=S.atime;
     $("qCat").textContent=cur.cat;$("qVal").textContent=cur.val;
     $("qText").textContent=cur.q;$("ansText").textContent=cur.a;
-    const im=$("qImg");if(cur.img){im.src=cur.img;im.hidden=false}else{im.removeAttribute("src");im.hidden=true}
+    const im=$("qImg"),cr=$("qCredit");if(cur.img){im.hidden=false;cr.textContent=/wikimedia/.test(cur.img)?"Фото: Wikimedia Commons":"";im.src=cur.img}else{im.removeAttribute("src");im.hidden=true;cr.textContent=""}
     $("qOv").classList.add("on");
     drawQ();startTick();pub();
   }
@@ -516,8 +519,8 @@ async function host(){
 
   let draft=[];
   function drawCats(){
-    $("cats").innerHTML=DB.cats.map((c,i)=>{const k=draft.indexOf(i);return '<label><input type="checkbox" id="cat'+i+'" data-cat="'+i+'"'+(k>=0?" checked":"")+'>'+esc(c.name)+(k>=0?'<small>раунд '+(Math.floor(k/PER)+1)+'</small>':'')+'</label>'}).join("");
-    $("sInfo").textContent="По 5 категорий в раунде. В базе "+DB.cats.reduce((n,c)=>n+c.q.length,0)+" вопросов, уже выпадало "+Object.keys(S.seen).length+". Сыгранные вопросы не повторяются, пока не закончатся.";
+    $("cats").innerHTML=DB.cats.map((c,i)=>{const k=draft.indexOf(i),n=draft.length,Rn=Math.max(1,Math.ceil(n/PER));let rr=0;while(rr<Rn-1&&k>=span(rr+1,n,Rn)[0])rr++;return '<label><input type="checkbox" id="cat'+i+'" data-cat="'+i+'"'+(k>=0?" checked":"")+'>'+esc(c.name)+(k>=0?'<small>раунд '+(rr+1)+'</small>':'')+'</label>'}).join("");
+    $("sInfo").textContent="До 5 категорий в раунде, категории делятся между раундами поровну. В базе "+DB.cats.reduce((n,c)=>n+c.q.length,0)+" вопросов, уже выпадало "+Object.keys(S.seen).length+". Сыгранные вопросы не повторяются, пока не закончатся.";
     $("sApply").disabled=!draft.length;
   }
 
@@ -564,11 +567,12 @@ async function host(){
     }else if(e.key==="Escape"){$("sOv").classList.remove("on");$("lOv").classList.remove("on")}
   });
   setInterval(()=>{dots();pub()},5000);
+  $("qImg").addEventListener("error",()=>{$("qCredit").textContent="Фото не загрузилось — проверьте интернет. Ответ ведущий может прочитать в «Показать ответ»."});
 
   startLink();
-  try{const res=await fetch("questions.json?v=5",{cache:"no-cache"});DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
+  try{const res=await fetch("questions.json?v=6",{cache:"no-cache"});DB=await res.json()}catch(e){$("board").innerHTML='<div class="board done"><h2>Не удалось загрузить вопросы</h2><p>Обновите страницу.</p></div>';return}
   if(S.sel.some(c=>!DB.cats[c])||(S.board&&S.board.some(b=>!DB.cats[b[0]]))){S.sel=DB.cats.map((_,i)=>i).slice(0,10);S.board=null}
-  if(S.dv!==5){S.dv=5;S.seen={};S=Object.assign(fresh(S),{dv:5});S.seen={}}
+  if(S.dv!==6){S=Object.assign(fresh(S),{dv:6});S.seen={};S.sel=DB.cats.map((_,i)=>i)}
   render();
 }
 

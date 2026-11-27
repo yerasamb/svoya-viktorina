@@ -1,6 +1,6 @@
 import json,sys,collections
 cats=[];cur=None
-for f in ['data/1.txt','data/2.txt','data/3.txt']:
+for f in ['data/1.txt','data/2.txt','data/3.txt','data/4.txt']:
     for ln in open(f,encoding='utf-8'):
         ln=ln.rstrip('\n')
         if not ln.strip(): continue
