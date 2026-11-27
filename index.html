@@ -71,6 +71,9 @@ h1 span{color:var(--gold)}
 @keyframes qfade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .fade{animation:qfade .7s ease-out both}
 .qimg.fade{animation-duration:.9s}
+@keyframes chin{from{opacity:0}to{opacity:1}}
+.qt .w{white-space:nowrap}
+.qt .ch{opacity:0;animation:chin .45s ease-out forwards}
 .buzz{border-radius:12px;padding:14px 18px;margin-bottom:14px;font:400 clamp(20px,2.8vw,34px)/1.15 "Russo One",sans-serif;background:var(--deep);border:2px solid var(--line);color:var(--mute)}
 .buzz.open{border-color:var(--gold);color:var(--gold)}
 .buzz.w1{background:var(--t1);border-color:var(--t1);color:#fff}
@@ -127,7 +130,7 @@ body[data-st=win] .bz{filter:none;background:radial-gradient(circle at 35% 30%,#
 .tools .btn{flex:1;padding:0 10px}
 .teams,.links{grid-template-columns:minmax(0,1fr)}
 }
-@media(prefers-reduced-motion:reduce){.cell,.timer i,.bz{transition:none}.fade{animation:none}}
+@media(prefers-reduced-motion:reduce){.cell,.timer i,.bz{transition:none}.fade,.qt .ch{animation:none;opacity:1}}
 </style>
 </head>
 <body>
@@ -418,15 +421,26 @@ async function host(){
       drawTimer();
     },1000);
   }
+  function typeIn(el,text){
+    el.textContent="";el.setAttribute("aria-label",text);
+    const chars=[...text],step=Math.min(40,1800/Math.max(1,chars.length));let n=0;
+    text.split(/(\s+)/).forEach(part=>{
+      if(!part)return;
+      if(/^\s+$/.test(part)){el.appendChild(document.createTextNode(part));n+=part.length;return}
+      const w=document.createElement("span");w.className="w";w.setAttribute("aria-hidden","true");
+      for(const c of part){const sp=document.createElement("span");sp.className="ch";sp.textContent=c;sp.style.animationDelay=Math.round(n*step)+"ms";w.appendChild(sp);n++}
+      el.appendChild(w);
+    });
+  }
   function openQ(g,i){
     const b=S.board[g],q=DB.cats[b[0]].q[b[1][i]];
     cur={g,i,r:S.round,val:BASE[i]*(S.round+1),tok:tok(),ph:"open",win:0,bl:[],done:0,ok:0,rev:false,cat:DB.cats[b[0]].name+(q[4]?" · "+q[4]:""),q:q[1],a:q[2],img:q[3]||""};
     left=S.timer;aLeft=S.atime;
     $("qCat").textContent=cur.cat;$("qVal").textContent=cur.val;
-    $("qText").textContent=cur.q;$("ansText").textContent=cur.a;
+    typeIn($("qText"),cur.q);$("ansText").textContent=cur.a;
     const im=$("qImg"),cr=$("qCredit");if(cur.img){im.hidden=false;cr.textContent=/wikimedia/.test(cur.img)?"Фото: Wikimedia Commons":"";im.src=cur.img}else{im.removeAttribute("src");im.hidden=true;cr.textContent=""}
     $("qOv").classList.add("on");
-    ["qText","qImg"].forEach(id=>{const el=$(id);el.classList.remove("fade");void el.offsetWidth;el.classList.add("fade")});
+    ["qImg"].forEach(id=>{const el=$(id);el.classList.remove("fade");void el.offsetWidth;el.classList.add("fade")});
     drawQ();startTick();pub();
   }
   function drawQ(){
